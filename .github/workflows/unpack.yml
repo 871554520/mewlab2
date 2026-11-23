@@ -12,8 +12,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-
-      - name: 下载分片并拼接
+      - name: 分片拼接
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -21,21 +20,19 @@ jobs:
           gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
           cat parts/part_*.bin > arc.rar
           rm -rf parts
-
-      - name: 解出 gpak 并渲染真实 SWF
+      - name: 解包并导出角色
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq unrar zlib1g-dev g++ >/dev/null
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
           rm -f arc.rar
-          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/softrender.cpp tools/render_main.cpp -lz -o /tmp/render
-          python3 tools/render_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/render renders
-          ls -l renders
-
+          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/softrender.cpp tools/export_main.cpp -lz -o /tmp/export
+          python3 tools/export_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/export arts
+          find arts -name '*.png' | wc -l
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: renders
-          path: renders
+          name: arts
+          path: arts
           if-no-files-found: warn
