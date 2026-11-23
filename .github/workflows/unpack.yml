@@ -12,36 +12,50 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: 分片拼接
+
+      - name: 分片拼接（带校验与重试）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p parts
-          gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
-          cat parts/part_*.bin > arc.rar
-          rm -rf parts
+          set -e
+          for attempt in 1 2 3; do
+            rm -rf parts arc.rar
+            mkdir -p parts
+            gh release download gpak --pattern 'part_*.bin' --dir parts --clobber || true
+            echo "parts: $(ls parts 2>/dev/null | wc -l) / 41"
+            cat parts/part_*.bin > arc.rar 2>/dev/null || true
+            SIZE=$(stat -c %s arc.rar 2>/dev/null || echo 0)
+            echo "arc.rar size: $SIZE (期望 4071175274)"
+            if [ "$SIZE" = "4071175274" ]; then echo "分片校验通过"; break; fi
+            echo "第 $attempt 次不完整，重试"; sleep 5
+          done
+          test "$(stat -c %s arc.rar)" = "4071175274"
+
       - name: 解包
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq unrar zlib1g-dev g++ >/dev/null
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
+          ls -l out/Mewgenics/resources.gpak || (echo "unrar 失败"; exit 1)
           rm -f arc.rar
-          ls -l out/Mewgenics/resources.gpak
+
       - name: 编译导出器
         run: |
-          set -x
           g++ -std=c++17 -O2 -Wall -Itools tools/swf.cpp tools/softrender.cpp tools/export_main.cpp -lz -o /tmp/export 2>&1 | tee compile.log
           ls -l /tmp/export
+
       - name: 导出角色
         run: |
           python3 tools/export_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/export arts 2>&1 | tee export.log || true
-          find arts -name '*.png' | wc -l || true
-      - name: 打包结果
+          find arts -name '*.png' 2>/dev/null | wc -l || true
+
+      - name: 打包
         if: always()
         run: |
-          tar -czf arts.tgz arts compile.log export.log 2>/dev/null || tar -czf arts.tgz compile.log export.log
+          tar -czf arts.tgz arts compile.log export.log 2>/dev/null || tar -czf arts.tgz compile.log 2>/dev/null || echo none > arts.tgz
           ls -lh arts.tgz
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
