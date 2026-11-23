@@ -22,31 +22,20 @@ jobs:
           cat parts/part_*.bin > arc.rar
           rm -rf parts
 
-      - name: 解出 gpak
+      - name: 解出 gpak 并渲染真实 SWF
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq unrar zlib1g-dev g++ >/dev/null
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
           rm -f arc.rar
-          ls -l out/Mewgenics/resources.gpak
-
-      - name: 用自家解析器扫全部 SWF
-        run: |
-          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/scanmain.cpp -lz -o /tmp/scan
-          python3 tools/scan_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/scan /tmp/swfwork > swf_scan.txt 2>&1 || true
-          tail -5 swf_scan.txt
-          wc -l swf_scan.txt
-
-      - name: 打包小报告
-        if: always()
-        run: |
-          tar -czf swf_report.tgz swf_scan.txt
-          ls -lh swf_report.tgz
+          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/softrender.cpp tools/render_main.cpp -lz -o /tmp/render
+          python3 tools/render_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/render renders
+          ls -l renders
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: swf-report
-          path: swf_report.tgz
+          name: renders
+          path: renders
           if-no-files-found: warn
