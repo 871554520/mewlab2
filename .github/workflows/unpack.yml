@@ -20,19 +20,31 @@ jobs:
           gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
           cat parts/part_*.bin > arc.rar
           rm -rf parts
-      - name: 解包并导出角色
+      - name: 解包
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq unrar zlib1g-dev g++ >/dev/null
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
           rm -f arc.rar
-          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/softrender.cpp tools/export_main.cpp -lz -o /tmp/export
-          python3 tools/export_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/export arts
-          find arts -name '*.png' | wc -l
+          ls -l out/Mewgenics/resources.gpak
+      - name: 编译导出器
+        run: |
+          set -x
+          g++ -std=c++17 -O2 -Wall -Itools tools/swf.cpp tools/softrender.cpp tools/export_main.cpp -lz -o /tmp/export 2>&1 | tee compile.log
+          ls -l /tmp/export
+      - name: 导出角色
+        run: |
+          python3 tools/export_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/export arts 2>&1 | tee export.log || true
+          find arts -name '*.png' | wc -l || true
+      - name: 打包结果
+        if: always()
+        run: |
+          tar -czf arts.tgz arts compile.log export.log 2>/dev/null || tar -czf arts.tgz compile.log export.log
+          ls -lh arts.tgz
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: arts
-          path: arts
+          path: arts.tgz
           if-no-files-found: warn
