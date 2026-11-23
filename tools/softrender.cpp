@@ -184,4 +184,26 @@ bool writePng(const std::string& path, const Canvas& c) {
     return true;
 }
 
+bool renderCharacter(const swf::Movie& mv, int characterId, double scale, Canvas& out) {
+    auto it = mv.shapes.find(characterId);
+    if (it == mv.shapes.end()) return false;
+    const swf::Shape& sh = it->second;
+    double w = (sh.bounds.x1 - sh.bounds.x0) * scale;
+    double h = (sh.bounds.y1 - sh.bounds.y0) * scale;
+    if (w <= 0 || h <= 0) return false;
+    int cw = (int)std::max(1.0, w), ch = (int)std::max(1.0, h);
+    out = Canvas(cw, ch);
+    out.fill(0, 0, 0, 0);
+    Xform base{scale, 0, 0, scale, -sh.bounds.x0 * scale, -sh.bounds.y0 * scale};
+    for (const auto& path : sh.paths) {
+        if (path.pts.size() < 3) continue;
+        std::vector<P2> poly;
+        for (auto& q : path.pts) poly.push_back(base.apply({q.first, q.second}));
+        uint8_t r, g, b, a;
+        fillColor(pickFill(sh, path), r, g, b, a);
+        fillPolygon(out, poly, r, g, b, a);
+    }
+    return true;
+}
+
 } // namespace soft
