@@ -1,0 +1,53 @@
+name: 解包 Mewgenics 资源
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载分片
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p parts
+          gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
+          ls parts | head -3
+          ls parts | wc -l
+          cat parts/part_*.bin > arc.rar
+          ls -l arc.rar
+
+      - name: 解出 gpak
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unrar
+          mkdir -p out
+          unrar x -o+ -idq arc.rar out/ || true
+          ls -l out/Mewgenics/ || true
+
+      - name: 按偏移取文件
+        run: |
+          python3 tools/dump_gpak.py out/Mewgenics/resources.gpak pack/index.json assets 2>/dev/null ||           python3 tools/dump_gpak.py "out/Mewgenics/resources.gpak" "pack/index.json" assets
+          du -sh assets/* | sort -h
+
+      - name: 打包
+        run: |
+          cd assets
+          tar -czf ../data_levels_textures.tgz data levels textures shaders
+          tar -cf ../swfs.tar swfs
+          cd ..
+          split -b 900M data_levels_textures.tgz dl_
+          split -b 900M swfs.tar swf_
+          ls -lh *.tgz *.tar dl_* swf_* 2>/dev/null | head
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-assets
+          path: |
+            dl_*
+            swf_*
+          if-no-files-found: error
