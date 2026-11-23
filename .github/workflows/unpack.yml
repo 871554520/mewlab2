@@ -19,51 +19,34 @@ jobs:
         run: |
           mkdir -p parts
           gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
-          echo "分片数: $(ls parts | wc -l)"
           cat parts/part_*.bin > arc.rar
           rm -rf parts
-          shasum -a 256 arc.rar
 
       - name: 解出 gpak
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq unrar
+          sudo apt-get install -y -qq unrar zlib1g-dev g++ >/dev/null
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
-          ls -l out/Mewgenics/ || true
           rm -f arc.rar
+          ls -l out/Mewgenics/resources.gpak
 
-      - name: 按偏移取文件
+      - name: 用自家解析器扫全部 SWF
         run: |
-          python3 tools/dump_gpak.py out/Mewgenics/resources.gpak pack/index.json assets
-          rm -f out/Mewgenics/resources.gpak
-          du -sh assets/* | sort -h
-          find assets -type f | wc -l
+          g++ -std=c++17 -O2 -Itools tools/swf.cpp tools/scanmain.cpp -lz -o /tmp/scan
+          python3 tools/scan_swfs.py out/Mewgenics/resources.gpak pack/index.json /tmp/scan /tmp/swfwork > swf_scan.txt 2>&1 || true
+          tail -5 swf_scan.txt
+          wc -l swf_scan.txt
 
-      - name: 打小包（数据/关卡/贴图/着色器）
+      - name: 打包小报告
+        if: always()
         run: |
-          cd assets
-          tar -czf ../mew-small.tgz data levels textures shaders
-          cd ..
-          ls -lh mew-small.tgz
-
-      - name: 打大包（SWF，另行下载）
-        run: |
-          cd assets
-          tar -cf ../swfs.tar swfs
-          cd ..
-          split -b 900M swfs.tar swf_
-          ls -lh swf_* 2>/dev/null | head
+          tar -czf swf_report.tgz swf_scan.txt
+          ls -lh swf_report.tgz
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: mew-small
-          path: mew-small.tgz
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mew-swfs
-          path: |
-            swf_*
+          name: swf-report
+          path: swf_report.tgz
           if-no-files-found: warn
