@@ -16,6 +16,8 @@ struct Canvas {
 };
 
 void renderFrame(const swf::Movie& mv, int frameIndex, double scale, Canvas& out);
+// 单独渲染一个角色（按包围盒裁切）
+bool renderCharacter(const swf::Movie& mv, int characterId, double scale, Canvas& out);
 bool writePng(const std::string& path, const Canvas& c);
 
 } // namespace soft
