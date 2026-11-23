@@ -19,7 +19,7 @@ jobs:
         run: |
           set -x
           mkdir -p parts
-          REL=$(curl -sL -H "Authorization: Bearer $GH_TOKEN"             https://api.github.com/repos/${{ github.repository }}/releases/tags/gpak)
+          REL=$(curl -sL -H "Authorization: Bearer $GH_TOKEN"             https://api.github.com/repos/${{ github.repository }}/releases/tags/gpak?per_page=100)
           echo "$REL" | head -c 300 || true
           IDS=$(echo "$REL" | python3 -c "import sys,json;d=json.load(sys.stdin);print(' '.join(a['id'] for a in d.get('assets',[])))") || true
           echo "asset ids: $(echo $IDS | wc -w)" | tee -a $GITHUB_STEP_SUMMARY
