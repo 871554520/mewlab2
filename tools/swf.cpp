@@ -398,6 +398,17 @@ bool parseMemory(const std::vector<uint8_t>& raw, Movie& mv, std::string* errp) 
             }
             mv.buttons[btn.id] = btn;
         }
+        else if (code == 56 && len >= 2) {   // ExportAssets
+            uint16_t cnt = rd.d[start] | (rd.d[start+1]<<8);
+            size_t p = start + 2, endE = start + len;
+            for (uint16_t i = 0; i < cnt && p + 2 <= endE; ++i) {
+                int id = rd.d[p] | (rd.d[p+1]<<8); p += 2;
+                std::string nm;
+                while (p < endE && rd.d[p]) nm.push_back((char)rd.d[p++]);
+                if (p < endE) p++;
+                mv.exports[id] = nm;
+            }
+        }
         else if (code == 12 && len > 0) {
             if (curFrame < (int)mv.frames.size())
                 mv.frames[curFrame].actions.assign(rd.d + start, rd.d + start + len);
