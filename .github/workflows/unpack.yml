@@ -22,7 +22,6 @@ jobs:
           echo "分片数: $(ls parts | wc -l)"
           cat parts/part_*.bin > arc.rar
           rm -rf parts
-          ls -l arc.rar
           shasum -a 256 arc.rar
 
       - name: 解出 gpak
@@ -39,24 +38,32 @@ jobs:
           python3 tools/dump_gpak.py out/Mewgenics/resources.gpak pack/index.json assets
           rm -f out/Mewgenics/resources.gpak
           du -sh assets/* | sort -h
+          find assets -type f | wc -l
 
-      - name: 打包分卷
+      - name: 打小包（数据/关卡/贴图/着色器）
         run: |
           cd assets
-          tar -czf ../data_levels_textures.tgz data levels textures shaders
+          tar -czf ../mew-small.tgz data levels textures shaders
+          cd ..
+          ls -lh mew-small.tgz
+
+      - name: 打大包（SWF，另行下载）
+        run: |
+          cd assets
           tar -cf ../swfs.tar swfs
           cd ..
-          rm -rf assets out
-          split -b 900M data_levels_textures.tgz dl_
           split -b 900M swfs.tar swf_
-          ls -lh dl_* swf_*
-          df -h .
+          ls -lh swf_* 2>/dev/null | head
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mew-assets
-          path: |
-            dl_*
-            swf_*
+          name: mew-small
+          path: mew-small.tgz
           if-no-files-found: error
-          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-swfs
+          path: |
+            swf_*
+          if-no-files-found: warn
