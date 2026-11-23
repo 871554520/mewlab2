@@ -3,6 +3,9 @@ name: 解包 Mewgenics 资源
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   unpack:
     runs-on: ubuntu-latest
@@ -10,16 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 下载分片
+      - name: 下载分片并拼接
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p parts
           gh release download gpak --pattern 'part_*.bin' --dir parts --clobber
-          ls parts | head -3
-          ls parts | wc -l
+          echo "分片数: $(ls parts | wc -l)"
           cat parts/part_*.bin > arc.rar
+          rm -rf parts
           ls -l arc.rar
+          shasum -a 256 arc.rar
 
       - name: 解出 gpak
         run: |
@@ -28,21 +32,25 @@ jobs:
           mkdir -p out
           unrar x -o+ -idq arc.rar out/ || true
           ls -l out/Mewgenics/ || true
+          rm -f arc.rar
 
       - name: 按偏移取文件
         run: |
-          python3 tools/dump_gpak.py out/Mewgenics/resources.gpak pack/index.json assets 2>/dev/null ||           python3 tools/dump_gpak.py "out/Mewgenics/resources.gpak" "pack/index.json" assets
+          python3 tools/dump_gpak.py out/Mewgenics/resources.gpak pack/index.json assets
+          rm -f out/Mewgenics/resources.gpak
           du -sh assets/* | sort -h
 
-      - name: 打包
+      - name: 打包分卷
         run: |
           cd assets
           tar -czf ../data_levels_textures.tgz data levels textures shaders
           tar -cf ../swfs.tar swfs
           cd ..
+          rm -rf assets out
           split -b 900M data_levels_textures.tgz dl_
           split -b 900M swfs.tar swf_
-          ls -lh *.tgz *.tar dl_* swf_* 2>/dev/null | head
+          ls -lh dl_* swf_*
+          df -h .
 
       - uses: actions/upload-artifact@v4
         with:
@@ -51,3 +59,4 @@ jobs:
             dl_*
             swf_*
           if-no-files-found: error
+          retention-days: 7
