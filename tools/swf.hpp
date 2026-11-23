@@ -80,6 +80,7 @@ struct Movie {
     std::map<int,Shape> shapes;
     std::map<int,Sprite> sprites;
     std::map<int,Button> buttons;
+    std::map<int,std::string> exports;     // ExportAssets：tagId -> 名字
     std::vector<Frame> frames;
     std::vector<std::vector<uint8_t>> initActions;   // DoInitAction（按定义顺序）
     std::map<std::string,int> tagHistogram;
